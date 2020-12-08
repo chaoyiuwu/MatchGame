@@ -1,17 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using System.Windows.Threading;
+using System.Threading;
 
 namespace MatchGame
 {
@@ -20,23 +14,37 @@ namespace MatchGame
 	/// </summary>
 	public partial class MainWindow : Window
 	{
+		DispatcherTimer dispatcherTimer;
+		int ElapsedSeconds;
+		
 		public MainWindow() {
 			InitializeComponent();
-
+			
 			SetupGame();
+			SetupDispatcherTimer();
+
+			Thread thread = new Thread(CheckGameEndThread);
+			thread.Start();
 		}
 
-		private void SetupGame() {
-			List<string> foodEmoji = new List<string>() {
-				"🍕","🍕",
-				"🍔","🍔",
-				"🍟","🍟",
-				"🌭","🌭",
-				"🥞","🥞",
-				"🍣","🍣",
-				"🍩","🍩",
-				"🥨","🥨"
-			};
+        #region timer setup
+        private void SetupDispatcherTimer()
+		{
+			dispatcherTimer = new DispatcherTimer();
+			dispatcherTimer.Tick += new EventHandler(dispatcherTimer_Tick);
+			dispatcherTimer.Interval = new TimeSpan(0, 0, 1);
+			ElapsedSeconds = 0;
+			dispatcherTimer.Start();
+		}
+		private void dispatcherTimer_Tick(object sender, EventArgs e)
+		{
+			ElapsedSeconds++;
+			lblTimer.Content = $"{ElapsedSeconds} s";
+			CommandManager.InvalidateRequerySuggested();
+		}
+        #endregion
+        private void SetupGame() {
+			List<string> foodEmoji = EmojiList.GetEmojiList(8);
 
 			Random random = new Random();
 
@@ -47,6 +55,8 @@ namespace MatchGame
 				foodEmoji.RemoveAt(index);
 			}
 		}
+
+
 		TextBlock lastTextBlockClicked;
 		bool findingMatch = false;
 		private void TextBlock_MouseDown(object sender, MouseButtonEventArgs e) {
@@ -75,6 +85,23 @@ namespace MatchGame
 				lastTextBlockClicked.Visibility = Visibility.Visible;
 				findingMatch = false;
 			}
+		}
+
+		private void CheckGameEndThread() {
+			
+			bool continueGame = true;
+			while (continueGame) {
+				try {
+					Dispatcher.Invoke(() =>
+					{
+						continueGame = mainGrid.Children.OfType<TextBlock>().Where(t => t.Visibility == Visibility.Visible).Count() != 0;
+					});
+				}
+                catch {
+					break;
+                }
+			}
+			dispatcherTimer.Stop();
 		}
 	}
 }
